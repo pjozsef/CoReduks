@@ -7,6 +7,7 @@ import io.kotlintest.should
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.mockito.Mockito
 import java.util.concurrent.Executors
@@ -33,6 +34,28 @@ class StoreTest : FreeSpec({
                 state3,
                 state4,
                 state5)
+    }
+
+    "Default params" - {
+        "scope should default to DEFAULT_SCOPE" {
+            val store = Store(initialState, mockReducer)
+
+            store.scope shouldBe Store.DEFAULT_SCOPE
+        }
+
+        "subscriber context should default to scope's context" - {
+            "when scope not defined" {
+                val store = Store(initialState, mockReducer)
+
+                store.defaultSubscriberContext shouldBe Store.DEFAULT_SCOPE.coroutineContext
+            }
+
+            "when scope defined" {
+                val store = Store(initialState, mockReducer, GlobalScope)
+
+                store.defaultSubscriberContext shouldBe GlobalScope.coroutineContext
+            }
+        }
     }
 
     "Store without middlewares" - {

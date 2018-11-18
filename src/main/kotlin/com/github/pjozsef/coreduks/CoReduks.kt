@@ -20,7 +20,7 @@ class Store<T>(
         initialState: T,
         val reducer: Reducer<T>,
         val scope: CoroutineScope = DEFAULT_SCOPE,
-        val defaultSubscriberContext: CoroutineContext = DEFAULT_SCOPE.coroutineContext) {
+        val defaultSubscriberContext: CoroutineContext = scope.coroutineContext) {
 
     companion object {
         val DEFAULT_SCOPE: CoroutineScope by lazy {
