@@ -83,20 +83,20 @@ class CoReduksStoreTest : FreeSpec({
             val action = "action"
 
             "should execute in the given coroutine context" {
-                lateinit var threadName: String
-
-                val store = CoReduksStore(initialState, object : Reducer<TestState> {
+                val reducer = object : Reducer<TestState> {
+                    lateinit var threadName:String
                     override fun invoke(currentState: TestState, action: Any): TestState {
                         threadName = Thread.currentThread().name
                         return currentState
                     }
 
-                })
+                }
+                val store = CoReduksStore(initialState, reducer)
 
                 store.dispatch(DUMMY_ACTION)
                 store.awaitCompletion()
 
-                threadName should startWith(THREAD_NAME_PREFIX)
+                reducer.threadName should startWith(THREAD_NAME_PREFIX)
             }
 
             "should call reducer" {
