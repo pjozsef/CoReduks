@@ -21,7 +21,8 @@ interface Store<T> {
     fun dispatch(action: Any)
 }
 
-class CoReduksStore<T>(
+
+class CoReduksStore<T> @JvmOverloads constructor(
         initialState: T,
         reducer: Reducer<T>,
         middlewares: List<Middleware<T>> = listOf(),
