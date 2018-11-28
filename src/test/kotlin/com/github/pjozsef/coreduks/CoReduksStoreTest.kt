@@ -28,7 +28,7 @@ class CoReduksStoreTest : FreeSpec({
     val state4 = TestState(4)
     val state5 = TestState(5)
 
-    val mockReducer = mock<Reducer<TestState>>().apply {
+    val mockReducer = mock<Reducer<TestState, String>>().apply {
         whenever(invoke(any(), any())).thenReturn(
                 state1,
                 state2,
@@ -83,9 +83,9 @@ class CoReduksStoreTest : FreeSpec({
             val action = "action"
 
             "should execute in the given coroutine context" {
-                val reducer = object : Reducer<TestState> {
+                val reducer = object : Reducer<TestState, String> {
                     lateinit var threadName:String
-                    override fun invoke(currentState: TestState, action: Any): TestState {
+                    override fun invoke(currentState: TestState, action: String): TestState {
                         threadName = Thread.currentThread().name
                         return currentState
                     }
@@ -208,7 +208,7 @@ class CoReduksStoreTest : FreeSpec({
             }
 
             "should not notify if state didn't change" {
-                val mockReducer = mock<Reducer<TestState>> {
+                val mockReducer = mock<Reducer<TestState, String>> {
                     on { invoke(any(), any()) } doAnswer {
                         it.arguments.first() as TestState
                     }
@@ -273,8 +273,8 @@ class CoReduksStoreTest : FreeSpec({
         val afterNext2 = mock<Runnable>()
         val afterNext3 = mock<Runnable>()
 
-        fun createMiddleware(before: Runnable, after: Runnable) = object : Middleware<TestState> {
-            override fun invoke(store: Store<TestState>, action: Any, next: (Any) -> TestState): TestState {
+        fun createMiddleware(before: Runnable, after: Runnable) = object : Middleware<TestState, String> {
+            override fun invoke(store: Store<TestState, String>, action: String, next: (String) -> TestState): TestState {
                 before.run()
                 val nextState = next(action)
                 after.run()
@@ -316,8 +316,8 @@ class CoReduksStoreTest : FreeSpec({
         "when a middleware breaks the call chain" {
             val breaksTheChain = mock<Runnable>()
             val middleware1 = createMiddleware(beforeNext1, afterNext1)
-            val middleware2 = object : Middleware<TestState> {
-                override fun invoke(store: Store<TestState>, action: Any, next: (Any) -> TestState): TestState {
+            val middleware2 = object : Middleware<TestState, String> {
+                override fun invoke(store: Store<TestState, String>, action: String, next: (String) -> TestState): TestState {
                     breaksTheChain.run()
                     return store.state
                 }
@@ -351,8 +351,8 @@ class CoReduksStoreTest : FreeSpec({
 
         "middlewares should see the up to date state" {
             val states = arrayListOf<TestState>()
-            val middleware = object : Middleware<TestState> {
-                override fun invoke(store: Store<TestState>, action: Any, next: (Any) -> TestState): TestState {
+            val middleware = object : Middleware<TestState, String> {
+                override fun invoke(store: Store<TestState, String>, action: String, next: (String) -> TestState): TestState {
                     states.add(store.state)
                     return next(action)
                 }
@@ -369,8 +369,8 @@ class CoReduksStoreTest : FreeSpec({
         "when a middleware dispatches an action throughout the call chain" {
             val secondAction = "Counter is 0!"
             val middleware1 = createMiddleware(beforeNext1, afterNext1)
-            val middleware2 = object : Middleware<TestState> {
-                override fun invoke(store: Store<TestState>, action: Any, next: (Any) -> TestState): TestState {
+            val middleware2 = object : Middleware<TestState, String> {
+                override fun invoke(store: Store<TestState, String>, action: String, next: (String) -> TestState): TestState {
                     if (store.state.counter == 0) {
                         store.dispatch(secondAction)
                     }
@@ -381,7 +381,7 @@ class CoReduksStoreTest : FreeSpec({
             val subscriber1 = mock<Subscriber<TestState>>()
             val subscriber2 = mock<Subscriber<TestState>>()
 
-            val store = CoReduksStore<TestState>(initialState, mockReducer, middlewares)
+            val store = CoReduksStore<TestState, String>(initialState, mockReducer, middlewares)
             store.subscribe(subscriber1)
             store.subscribe(subscriber2)
 
@@ -410,9 +410,9 @@ class CoReduksStoreTest : FreeSpec({
         "when a middleware dispatches an action throughout the call chain and breaks the call chain" {
             val secondAction = "Counter is 0!"
             val middleware1 = createMiddleware(beforeNext1, afterNext1)
-            val middleware2 = object : Middleware<TestState> {
+            val middleware2 = object : Middleware<TestState, String> {
                 var alreadyFired = false
-                override fun invoke(store: Store<TestState>, action: Any, next: (Any) -> TestState): TestState {
+                override fun invoke(store: Store<TestState, String>, action: String, next: (String) -> TestState): TestState {
                     return if (!alreadyFired) {
                         store.dispatch(secondAction)
                         alreadyFired = true
@@ -426,7 +426,7 @@ class CoReduksStoreTest : FreeSpec({
             val subscriber1 = mock<Subscriber<TestState>>()
             val subscriber2 = mock<Subscriber<TestState>>()
 
-            val store = CoReduksStore<TestState>(initialState, mockReducer, middlewares)
+            val store = CoReduksStore<TestState, String>(initialState, mockReducer, middlewares)
             store.subscribe(subscriber1)
             store.subscribe(subscriber2)
 
