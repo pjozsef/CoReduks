@@ -8,7 +8,7 @@ class CoReduksLoggingMiddleware<S, A>: Middleware<S, A> {
         println("CoReduksLogginMiddleware: old state: ${store.state}")
         println("CoReduksLogginMiddleware: action: $action")
         val newState = next(action)
-        println("CoReduksLogginMiddleware: new state: $newState\n")
+        println("CoReduksLogginMiddleware: new state: $newState")
         return newState
     }
 }
