@@ -1,0 +1,24 @@
+apply plugin: 'maven-publish'
+
+task sourcesJar(type: Jar, dependsOn: project.classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: project.javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+publishing {
+    publications {
+        "$project.name"(MavenPublication) {
+            groupId = group
+            artifactId = project.name
+
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+}
