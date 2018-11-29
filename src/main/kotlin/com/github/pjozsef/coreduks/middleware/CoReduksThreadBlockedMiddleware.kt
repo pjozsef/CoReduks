@@ -13,10 +13,10 @@ class CoReduksThreadBlockedMiddleware<S, A>(
         val duration = System.currentTimeMillis() - start
         if (duration > threshold) {
             beyondThresholdAction?.invoke(duration) ?: kotlin.run {
-                System.err.println("CoReduks thread blocked for $duration millis!")
+                System.err.println("CoReduks thread blocked for $duration millis for action $action!")
             }
         } else if (verbose) {
-            println("Action handling took $duration millis.")
+            println("Action handling took $duration millis for action $action.")
         }
         return newState
     }
