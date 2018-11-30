@@ -21,13 +21,19 @@ interface Store<S, A> {
     fun dispatch(action: A)
 }
 
+interface Observable<S> {
+    val defaultSubscriberContext: CoroutineContext
+
+    fun subscribe(subscriber: Subscriber<S>, context: CoroutineContext = defaultSubscriberContext)
+    fun unsubscribe(subscriber: Subscriber<S>)
+}
 
 class CoReduksStore<S, A> @JvmOverloads constructor(
         initialState: S,
         reducer: Reducer<S, A>,
         middlewares: List<Middleware<S, A>> = listOf(),
         val scope: CoroutineScope = DEFAULT_SCOPE,
-        val defaultSubscriberContext: CoroutineContext = scope.coroutineContext) : Store<S, A> {
+        override val defaultSubscriberContext: CoroutineContext = scope.coroutineContext) : Store<S, A>, Observable<S> {
 
     companion object {
         val DEFAULT_SCOPE: CoroutineScope by lazy {
@@ -84,7 +90,7 @@ class CoReduksStore<S, A> @JvmOverloads constructor(
         }
     }
 
-    fun subscribe(subscriber: Subscriber<S>, context: CoroutineContext = defaultSubscriberContext) {
+    override fun subscribe(subscriber: Subscriber<S>, context: CoroutineContext) {
         scope.launch {
             subscribers[subscriber] = context
             withContext(context) {
@@ -93,7 +99,7 @@ class CoReduksStore<S, A> @JvmOverloads constructor(
         }
     }
 
-    fun unsubscribe(subscriber: Subscriber<S>) {
+    override fun unsubscribe(subscriber: Subscriber<S>) {
         scope.launch {
             subscribers.remove(subscriber)
         }
