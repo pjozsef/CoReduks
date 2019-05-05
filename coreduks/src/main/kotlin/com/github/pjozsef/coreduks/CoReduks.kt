@@ -1,7 +1,9 @@
 package com.github.pjozsef.coreduks
 
 import kotlinx.coroutines.*
+import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
+import kotlin.collections.ArrayList
 import kotlin.coroutines.CoroutineContext
 
 interface Reducer<S, A> {
@@ -23,10 +25,14 @@ interface Store<S, A> {
 
 interface Observable<S> {
     val defaultSubscriberContext: CoroutineContext
-
     fun subscribe(subscriber: Subscriber<S>, context: CoroutineContext = defaultSubscriberContext)
     fun unsubscribe(subscriber: Subscriber<S>)
 }
+
+data class Subscription<S>(
+        val weakSubscriber: WeakReference<Subscriber<S>>,
+        val coroutineContext: CoroutineContext
+)
 
 class CoReduksStore<S, A> @JvmOverloads constructor(
         initialState: S,
@@ -65,7 +71,7 @@ class CoReduksStore<S, A> @JvmOverloads constructor(
 
     private var currentState: S = initialState
     private val proxy: StoreProxy = StoreProxy()
-    private val subscribers: MutableMap<Subscriber<S>, CoroutineContext> = hashMapOf()
+    private val subscriptions: MutableList<Subscription<S>> = ArrayList()
     private val dispatchFunction: (A) -> S = createDispatchFunction(middlewares.asReversed()) {
         reducer(currentState, it)
     }
@@ -81,9 +87,9 @@ class CoReduksStore<S, A> @JvmOverloads constructor(
             val newState = dispatchFunction(action)
             if (currentState != newState) {
                 currentState = newState
-                for ((subscriber, context) in subscribers) {
+                for ((subscriber, context) in subscriptions) {
                     withContext(context) {
-                        subscriber.onNewState(currentState)
+                        subscriber.get()?.onNewState(currentState)
                     }
                 }
             }
@@ -92,16 +98,28 @@ class CoReduksStore<S, A> @JvmOverloads constructor(
 
     override fun subscribe(subscriber: Subscriber<S>, context: CoroutineContext) {
         scope.launch {
-            subscribers[subscriber] = context
-            withContext(context) {
-                subscriber.onNewState(currentState)
+            Subscription(WeakReference(subscriber), context).takeIf { subscription ->
+                subscriptions.none {
+                    subscription.weakSubscriber.get() === it.weakSubscriber.get()
+                }
+            }?.let {
+                subscriptions.add(it)
+                withContext(it.coroutineContext) {
+                    it.weakSubscriber.get()?.onNewState(currentState)
+                }
             }
         }
     }
 
     override fun unsubscribe(subscriber: Subscriber<S>) {
         scope.launch {
-            subscribers.remove(subscriber)
+            subscriptions.mapIndexed { i, it ->
+                i to it
+            }.filter { (_, it) ->
+                it.weakSubscriber.get() === subscriber
+            }.reversed().forEach { (i, _) ->
+                subscriptions.removeAt(i)
+            }
         }
     }
 

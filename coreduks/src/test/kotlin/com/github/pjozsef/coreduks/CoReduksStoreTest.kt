@@ -6,15 +6,11 @@ import io.kotlintest.matchers.startWith
 import io.kotlintest.should
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FreeSpec
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Runnable
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.*
 import org.mockito.Mockito
 import java.util.concurrent.Executors
-import kotlin.coroutines.CoroutineContext
 
-private const val THREAD_NAME_PREFIX = "CoReduksDispatcherThread @CoReduks"
+private const val THREAD_NAME_PREFIX = "CoReduksDispatcherThread"
 
 private const val DUMMY_ACTION: String = ""
 
@@ -38,6 +34,7 @@ class CoReduksStoreTest : FreeSpec({
     }
 
     "Default params" - {
+
         "scope should default to DEFAULT_SCOPE" {
             val store = CoReduksStore(initialState, mockReducer)
 
@@ -117,12 +114,13 @@ class CoReduksStoreTest : FreeSpec({
 
             "should execute subscribe in the given coroutine context"{
                 lateinit var threadName: String
-                val subscriberMap = mock<HashMap<Subscriber<TestState>, CoroutineContext>> {
+                val subscriberList = spy(mutableListOf<Subscription<TestState>>()) {
                     doAnswer {
                         threadName = Thread.currentThread().name
-                    }.`when`(it)[com.nhaarman.mockitokotlin2.any()] = com.nhaarman.mockitokotlin2.any()
+                        true
+                    }.`when`(it).add(any())
                 }
-                store.setProperty("subscribers", subscriberMap)
+                store.setProperty("subscriptions", subscriberList)
 
                 store.subscribe(mock())
                 store.awaitCompletion()
@@ -222,20 +220,35 @@ class CoReduksStoreTest : FreeSpec({
                 verify(subscriber1).onNewState(initialState)
                 verifyNoMoreInteractions(subscriber1)
             }
+
+            "should not allow multiple subscriptions from the same Subscriber" {
+                val subscriber = mock<Subscriber<TestState>>()
+
+                store.subscribe(subscriber)
+                store.subscribe(subscriber)
+                store.subscribe(subscriber)
+                store.subscribe(subscriber)
+                store.awaitCompletion()
+
+                verify(subscriber, times(1)).onNewState(any())
+            }
         }
 
         "Unsubscribe" - {
 
             "should execute unsubscribe in the given coroutine context"{
                 lateinit var threadName: String
-                val subscriberMap = mock<HashMap<Subscriber<TestState>, CoroutineContext>> {
+                val subscriberList = spy(mutableListOf<Subscription<TestState>>()) {
                     doAnswer {
                         threadName = Thread.currentThread().name
-                    }.`when`(it).remove(com.nhaarman.mockitokotlin2.any())
+                        true
+                    }.`when`(it).removeAt(any())
                 }
-                store.setProperty("subscribers", subscriberMap)
+                store.setProperty("subscriptions", subscriberList)
 
-                store.unsubscribe(mock())
+                val subscriber = mock<Subscriber<TestState>>()
+                store.subscribe(subscriber)
+                store.unsubscribe(subscriber)
                 store.awaitCompletion()
 
                 threadName should startWith(THREAD_NAME_PREFIX)
@@ -244,20 +257,25 @@ class CoReduksStoreTest : FreeSpec({
             "should not notify unsubscribed objects" {
                 val subscriber1 = mock<Subscriber<TestState>>()
                 val subscriber2 = mock<Subscriber<TestState>>()
+                val subscriber3 = mock<Subscriber<TestState>>()
 
                 store.subscribe(subscriber1)
                 store.subscribe(subscriber2)
+                store.subscribe(subscriber3)
                 store.dispatch(DUMMY_ACTION)
                 store.unsubscribe(subscriber1)
+                store.unsubscribe(subscriber2)
                 store.dispatch(DUMMY_ACTION)
                 store.awaitCompletion()
 
-                Mockito.inOrder(subscriber1, subscriber2).run {
+                Mockito.inOrder(subscriber1, subscriber2, subscriber3).run {
                     verify(subscriber1).onNewState(initialState)
                     verify(subscriber2).onNewState(initialState)
+                    verify(subscriber3).onNewState(initialState)
                     verify(subscriber1).onNewState(state1)
                     verify(subscriber2).onNewState(state1)
-                    verify(subscriber2).onNewState(state2)
+                    verify(subscriber3).onNewState(state1)
+                    verify(subscriber3).onNewState(state2)
                 }
                 verifyNoMoreInteractions(subscriber1)
                 verifyNoMoreInteractions(subscriber2)
@@ -381,7 +399,7 @@ class CoReduksStoreTest : FreeSpec({
             val subscriber1 = mock<Subscriber<TestState>>()
             val subscriber2 = mock<Subscriber<TestState>>()
 
-            val store = CoReduksStore<TestState, String>(initialState, mockReducer, middlewares)
+            val store = CoReduksStore(initialState, mockReducer, middlewares)
             store.subscribe(subscriber1)
             store.subscribe(subscriber2)
 
@@ -426,7 +444,7 @@ class CoReduksStoreTest : FreeSpec({
             val subscriber1 = mock<Subscriber<TestState>>()
             val subscriber2 = mock<Subscriber<TestState>>()
 
-            val store = CoReduksStore<TestState, String>(initialState, mockReducer, middlewares)
+            val store = CoReduksStore(initialState, mockReducer, middlewares)
             store.subscribe(subscriber1)
             store.subscribe(subscriber2)
 
