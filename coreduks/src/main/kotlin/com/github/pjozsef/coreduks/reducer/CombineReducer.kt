@@ -69,6 +69,8 @@ class CombinedReducer<S, A>(
 
     interface SliceCollector<S, A> {
         fun slice(property: KProperty1<S, *>, action: (S, A) -> Any)
+
+        operator fun KProperty1<S, *>.invoke(action: (S, A) -> Any) = slice(this, action)
     }
 
     interface PartialReducer<S, A, T : Any> {
