@@ -1,5 +1,7 @@
 package com.github.pjozsef.coreduks.reducer
 
+import com.github.pjozsef.coreduks.CoReduksStore
+import com.github.pjozsef.coreduks.awaitCompletion
 import io.kotlintest.matchers.startWith
 import io.kotlintest.should
 import io.kotlintest.shouldBe
@@ -104,9 +106,14 @@ class CombineReducerKtTest : FreeSpec({
         val expectedState = TestPerson(43, 180, "Mr John", LocalDateTime.MAX)
 
         "with real reducers" {
-            actions.fold(initialState, reducer::invoke).let {
-                it shouldBe expectedState
-            }
+            actions.fold(initialState, reducer::invoke) shouldBe expectedState
+        }
+
+        "with real reducer through a real Store" {
+            CoReduksStore(initialState, reducer).also {
+                actions.forEach(it::dispatch)
+                it.awaitCompletion()
+            }.state shouldBe expectedState
         }
     }
 
