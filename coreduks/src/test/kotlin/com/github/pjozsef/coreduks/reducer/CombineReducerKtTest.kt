@@ -17,10 +17,10 @@ class CombineReducerKtTest : FreeSpec({
         "should fail if not all properties are enumerated" {
             shouldThrow<IllegalArgumentException> {
                 combineReducers<TestPerson, TestAction> {
-                    slice(TestPerson::age) { state, _ ->
+                    TestPerson::age { state, _ ->
                         state.age
                     }
-                    slice(TestPerson::height) { state, _ ->
+                    TestPerson::height { state, _ ->
                         state.height
                     }
                 }
@@ -30,16 +30,16 @@ class CombineReducerKtTest : FreeSpec({
         "should fail if lambda return type does not match property type" {
             shouldThrow<IllegalArgumentException> {
                 combineReducers<TestPerson, TestAction> {
-                    slice(TestPerson::age) { state, _ ->
+                    TestPerson::age { state, _ ->
                         state.age
                     }
-                    slice(TestPerson::birthDay) { state, _ ->
+                    TestPerson::birthDay { state, _ ->
                         state.birthDay
                     }
-                    slice(TestPerson::height) { state, _ ->
+                    TestPerson::height { state, _ ->
                         state.height
                     }
-                    slice(TestPerson::name) { state, _ ->
+                    TestPerson::name { state, _ ->
                         state.age
                     }
                 }
@@ -48,63 +48,68 @@ class CombineReducerKtTest : FreeSpec({
 
     }
 
+    "combined reducer with identity reducers should return the same state" {
+        val reducer = combineReducers<TestPerson, TestAction> {
+            TestPerson::age { state, _ ->
+                state.age
+            }
+            TestPerson::birthDay { state, _ ->
+                state.birthDay
+            }
+            TestPerson::height { state, _ ->
+                state.height
+            }
+            TestPerson::name { state, _ ->
+                state.name
+            }
+        }
+        val input = TestPerson(40, 180, "John", LocalDateTime.MAX)
+        val output = reducer.invoke(input, TestAction())
+        output shouldBe input
+    }
+
     "combined reducer" - {
-        "with identity reducers should return the same state" {
-            val reducer = combineReducers<TestPerson, TestAction> {
-                slice(TestPerson::age) { state, _ ->
-                    state.age
-                }
-                slice(TestPerson::birthDay) { state, _ ->
-                    state.birthDay
-                }
-                slice(TestPerson::height) { state, _ ->
-                    state.height
-                }
-                slice(TestPerson::name) { state, _ ->
-                    state.name
+        class CelebrateBirthDay
+        data class ChangeName(val newName: String)
+
+        val actions = listOf(
+                CelebrateBirthDay(),
+                ChangeName("Mr John"),
+                CelebrateBirthDay(),
+                CelebrateBirthDay()
+        )
+
+        val reducer = combineReducers<TestPerson, Any> {
+            TestPerson::age { state, action ->
+                when (action) {
+                    is CelebrateBirthDay -> state.age + 1
+                    else -> state.age
                 }
             }
-            val input = TestPerson(40, 180, "John", LocalDateTime.MAX)
-            val output = reducer.invoke(input, TestAction())
-            output shouldBe input
+            TestPerson::birthDay { state, _ ->
+                state.birthDay
+            }
+            TestPerson::height { state, _ ->
+                state.height
+            }
+            TestPerson::name { state, action ->
+                when (action) {
+                    is ChangeName -> action.newName
+                    else -> state.name
+                }
+            }
         }
 
+        val initialState = TestPerson(40, 180, "John", LocalDateTime.MAX)
+        val expectedState = TestPerson(43, 180, "Mr John", LocalDateTime.MAX)
+
         "with real reducers" {
-            class CelebrateBirthDay
-            data class ChangeName(val newName: String)
-
-            val reducer = combineReducers<TestPerson, Any> {
-                slice(TestPerson::age) { state, action ->
-                    when (action) {
-                        is CelebrateBirthDay -> state.age + 1
-                        else -> state.age
-                    }
-                }
-                slice(TestPerson::birthDay) { state, _ ->
-                    state.birthDay
-                }
-                slice(TestPerson::height) { state, _ ->
-                    state.height
-                }
-                slice(TestPerson::name) { state, action ->
-                    when (action) {
-                        is ChangeName -> action.newName
-                        else -> state.name
-                    }
-                }
+            actions.fold(initialState, reducer::invoke).let {
+                it shouldBe expectedState
             }
-
-            val actions = listOf(
-                    CelebrateBirthDay(),
-                    ChangeName("Mr John"),
-                    CelebrateBirthDay(),
-                    CelebrateBirthDay()
-            )
-            val person = TestPerson(40, 180, "John", LocalDateTime.MAX)
-            val expectedPerson = TestPerson(43, 180, "Mr John", LocalDateTime.MAX)
-            val actualPerson = actions.fold(person, reducer::invoke)
-            actualPerson shouldBe expectedPerson
         }
     }
 
-})
+}) {
+    override fun isInstancePerTest() = true
+}
